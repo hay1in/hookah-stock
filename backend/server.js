@@ -10,6 +10,43 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// ============== НАСТРОЙКИ АВТОРИЗАЦИИ ==============
+const USERS = {
+    'HP Life': { password: 'flavorteam', role: 'admin' },
+    'test': { password: 'test', role: 'guest' }
+};
+
+function authMiddleware(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    
+    if (!authHeader) {
+        return res.status(401).json({ error: 'Требуется авторизация' });
+    }
+    
+    const base64Credentials = authHeader.split(' ')[1];
+    if (!base64Credentials) {
+        return res.status(401).json({ error: 'Неверный формат авторизации' });
+    }
+    
+    const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
+    const [username, password] = credentials.split(':');
+    
+    if (!USERS[username] || USERS[username].password !== password) {
+        return res.status(401).json({ error: 'Неверный логин или пароль' });
+    }
+    
+    req.user = { username: username, role: USERS[username].role };
+    next();
+}
+
+function requireAdmin(req, res, next) {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Недостаточно прав. Только для администратора.' });
+    }
+    next();
+}
+
+// ============== БАЗА ДАННЫХ ==============
 const initSqlJs = require('sql.js');
 let db;
 
@@ -95,8 +132,30 @@ function runQuery(sql, params = []) {
 
 // ============== API РОУТЫ ==============
 
-// 🔵 Получить всё содержимое склада
-app.get('/api/inventory', (req, res) => {
+// 🔑 ЛОГИН
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Введите логин и пароль' });
+    }
+    
+    if (!USERS[username] || USERS[username].password !== password) {
+        return res.status(401).json({ error: 'Неверный логин или пароль' });
+    }
+    
+    const token = Buffer.from(username + ':' + password).toString('base64');
+    
+    res.json({ 
+        success: true, 
+        token: token,
+        role: USERS[username].role,
+        username: username
+    });
+});
+
+// 🔵 СКЛАД (чтение)
+app.get('/api/inventory', authMiddleware, (req, res) => {
     try {
         const items = runQuery('SELECT * FROM inventory ORDER BY brand, flavor');
         res.json(items);
@@ -105,8 +164,8 @@ app.get('/api/inventory', (req, res) => {
     }
 });
 
-// 🔵 Получить список брендов
-app.get('/api/brands', (req, res) => {
+// 🔵 БРЕНДЫ (чтение)
+app.get('/api/brands', authMiddleware, (req, res) => {
     try {
         const brands = runQuery('SELECT DISTINCT brand FROM inventory ORDER BY brand');
         res.json(brands.map(b => b.brand));
@@ -115,8 +174,8 @@ app.get('/api/brands', (req, res) => {
     }
 });
 
-// 🔵 Получить вкусы бренда
-app.get('/api/flavors/:brand', (req, res) => {
+// 🔵 ВКУСЫ БРЕНДА (чтение)
+app.get('/api/flavors/:brand', authMiddleware, (req, res) => {
     try {
         const brand = decodeURIComponent(req.params.brand);
         const flavors = runQuery('SELECT DISTINCT flavor FROM inventory WHERE brand = ? ORDER BY flavor', [brand]);
@@ -126,8 +185,8 @@ app.get('/api/flavors/:brand', (req, res) => {
     }
 });
 
-// 🔵 Получить граммовки для бренда+вкуса
-app.get('/api/weights/:brand/:flavor', (req, res) => {
+// 🔵 ГРАММОВКИ (чтение)
+app.get('/api/weights/:brand/:flavor', authMiddleware, (req, res) => {
     try {
         const brand = decodeURIComponent(req.params.brand);
         const flavor = decodeURIComponent(req.params.flavor);
@@ -138,8 +197,8 @@ app.get('/api/weights/:brand/:flavor', (req, res) => {
     }
 });
 
-// 🟢 ЗАКУП
-app.post('/api/buy', (req, res) => {
+// 🟢 ЗАКУП (только админ)
+app.post('/api/buy', authMiddleware, requireAdmin, (req, res) => {
     const { brand, flavor, weight, quantity } = req.body;
     
     if (!brand || !flavor || !weight || !quantity || quantity <= 0) {
@@ -169,8 +228,8 @@ app.post('/api/buy', (req, res) => {
     }
 });
 
-// 🔴 РАСХОД
-app.post('/api/spend', (req, res) => {
+// 🔴 РАСХОД (только админ)
+app.post('/api/spend', authMiddleware, requireAdmin, (req, res) => {
     const { brand, flavor, weight, quantity } = req.body;
     
     if (!brand || !flavor || !weight || !quantity || quantity <= 0) {
@@ -202,8 +261,93 @@ app.post('/api/spend', (req, res) => {
     }
 });
 
-// 📊 ОСНОВНАЯ СТАТИСТИКА
-app.get('/api/statistics', (req, res) => {
+// 🗑️ ВЫБИТЬ ПОЗИЦИЮ (только админ)
+app.post('/api/clear-position', authMiddleware, requireAdmin, (req, res) => {
+    const { brand, flavor, weight } = req.body;
+    
+    if (!brand || !flavor) {
+        return res.status(400).json({ error: 'Укажите бренд и вкус' });
+    }
+
+    try {
+        let items;
+        let totalCleared = 0;
+        
+        if (weight) {
+            items = runQuery('SELECT * FROM inventory WHERE brand = ? AND flavor = ? AND weight = ?', [brand, flavor, weight]);
+        } else {
+            items = runQuery('SELECT * FROM inventory WHERE brand = ? AND flavor = ?', [brand, flavor]);
+        }
+        
+        if (items.length === 0) {
+            return res.status(400).json({ error: 'Позиция не найдена' });
+        }
+        
+        items.forEach(item => {
+            if (item.packs > 0) {
+                const cleared = item.packs;
+                db.run('UPDATE inventory SET packs = 0, updated_at = datetime("now") WHERE id = ?', [item.id]);
+                
+                const message = `🗑️ ВЫБИТО: ${item.brand} "${item.flavor}" ${item.weight}г (списано ${cleared} уп.)`;
+                db.run('INSERT INTO logs (type, brand, flavor, weight, quantity, message, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))', ['CLEAR', item.brand, item.flavor, item.weight, -cleared, message]);
+                
+                totalCleared += cleared;
+            }
+        });
+        
+        saveDatabase();
+        
+        res.json({ 
+            success: true, 
+            message: `Выбито с полки: ${brand} "${flavor}" - ${totalCleared} уп.`,
+            totalCleared: totalCleared
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 🗑️ ВЫБИТЬ БРЕНД (только админ)
+app.post('/api/clear-brand', authMiddleware, requireAdmin, (req, res) => {
+    const { brand } = req.body;
+    
+    if (!brand) {
+        return res.status(400).json({ error: 'Укажите бренд' });
+    }
+
+    try {
+        const items = runQuery('SELECT * FROM inventory WHERE brand = ? AND packs > 0', [brand]);
+        
+        if (items.length === 0) {
+            return res.status(400).json({ error: 'Нет активных позиций этого бренда' });
+        }
+        
+        let totalCleared = 0;
+        
+        items.forEach(item => {
+            const cleared = item.packs;
+            db.run('UPDATE inventory SET packs = 0, updated_at = datetime("now") WHERE id = ?', [item.id]);
+            
+            const message = `🗑️ ВЫБИТ БРЕНД: ${item.brand} "${item.flavor}" ${item.weight}г (списано ${cleared} уп.)`;
+            db.run('INSERT INTO logs (type, brand, flavor, weight, quantity, message, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))', ['CLEAR_BRAND', item.brand, item.flavor, item.weight, -cleared, message]);
+            
+            totalCleared += cleared;
+        });
+        
+        saveDatabase();
+        
+        res.json({ 
+            success: true, 
+            message: `Бренд ${brand} полностью выбит! Списано ${totalCleared} уп.`,
+            totalCleared: totalCleared
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 📊 СТАТИСТИКА (чтение)
+app.get('/api/statistics', authMiddleware, (req, res) => {
     try {
         const topSpent = runQuery(`
             SELECT brand, flavor, SUM(ABS(quantity)) as total_spent
@@ -230,8 +374,8 @@ app.get('/api/statistics', (req, res) => {
     }
 });
 
-// 📊 ДЕТАЛЬНАЯ СТАТИСТИКА ПО БРЕНДАМ
-app.get('/api/statistics/brands', (req, res) => {
+// 📊 ДЕТАЛИ ПО БРЕНДАМ (чтение)
+app.get('/api/statistics/brands', authMiddleware, (req, res) => {
     try {
         const brands = runQuery(`
             SELECT 
@@ -251,8 +395,8 @@ app.get('/api/statistics/brands', (req, res) => {
     }
 });
 
-// 📊 ДЕТАЛЬНАЯ СТАТИСТИКА ПО ВКУСАМ
-app.get('/api/statistics/flavors', (req, res) => {
+// 📊 ДЕТАЛИ ПО ВКУСАМ (чтение)
+app.get('/api/statistics/flavors', authMiddleware, (req, res) => {
     try {
         const flavors = runQuery(`
             SELECT 
@@ -271,36 +415,28 @@ app.get('/api/statistics/flavors', (req, res) => {
     }
 });
 
-// 📊 ПОЗИЦИИ В НАЛИЧИИ
-app.get('/api/statistics/in-stock', (req, res) => {
+// 📊 В НАЛИЧИИ (чтение)
+app.get('/api/statistics/in-stock', authMiddleware, (req, res) => {
     try {
-        const items = runQuery(`
-            SELECT * FROM inventory 
-            WHERE packs > 0 
-            ORDER BY brand, flavor, weight
-        `);
+        const items = runQuery(`SELECT * FROM inventory WHERE packs > 0 ORDER BY brand, flavor, weight`);
         res.json(items);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 📊 ВЫБЫВШИЕ ПОЗИЦИИ
-app.get('/api/statistics/out-of-stock', (req, res) => {
+// 📊 ВЫБЫВШИЕ (чтение)
+app.get('/api/statistics/out-of-stock', authMiddleware, (req, res) => {
     try {
-        const items = runQuery(`
-            SELECT * FROM inventory 
-            WHERE packs = 0 
-            ORDER BY brand, flavor, weight
-        `);
+        const items = runQuery(`SELECT * FROM inventory WHERE packs = 0 ORDER BY brand, flavor, weight`);
         res.json(items);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 📊 СТАТИСТИКА ПО ГРАММОВКАМ
-app.get('/api/statistics/weights', (req, res) => {
+// 📊 ПО ГРАММОВКАМ (чтение)
+app.get('/api/statistics/weights', authMiddleware, (req, res) => {
     try {
         const weights = runQuery(`
             SELECT 
@@ -319,8 +455,8 @@ app.get('/api/statistics/weights', (req, res) => {
     }
 });
 
-// 📥 ЭКСПОРТ В EXCEL
-app.get('/api/export/excel', (req, res) => {
+// 📥 EXCEL (чтение)
+app.get('/api/export/excel', authMiddleware, (req, res) => {
     try {
         const inventory = runQuery('SELECT * FROM inventory ORDER BY brand, flavor, weight');
         const logs = runQuery('SELECT * FROM logs ORDER BY timestamp DESC LIMIT 500');
@@ -341,7 +477,7 @@ app.get('/api/export/excel', (req, res) => {
         
         const logsData = logs.map(log => ({
             'Дата': log.timestamp,
-            'Тип': log.type === 'BUY' ? 'Закуп' : 'Расход',
+            'Тип': log.type === 'BUY' ? 'Закуп' : (log.type === 'SPEND' ? 'Расход' : 'Выбито'),
             'Бренд': log.brand,
             'Вкус': log.flavor,
             'Граммовка': log.weight,
@@ -363,8 +499,8 @@ app.get('/api/export/excel', (req, res) => {
     }
 });
 
-// 📜 ИСТОРИЯ ОПЕРАЦИЙ
-app.get('/api/logs', (req, res) => {
+// 📜 ИСТОРИЯ (чтение)
+app.get('/api/logs', authMiddleware, (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 100;
         const logs = runQuery('SELECT * FROM logs ORDER BY timestamp DESC LIMIT ?', [limit]);
@@ -374,99 +510,7 @@ app.get('/api/logs', (req, res) => {
     }
 });
 
-// 🗑️ СПИСАНИЕ ВСЕХ ОСТАТКОВ ПОЗИЦИИ
-app.post('/api/clear-position', (req, res) => {
-    const { brand, flavor, weight } = req.body;
-    
-    if (!brand || !flavor) {
-        return res.status(400).json({ error: 'Укажите бренд и вкус' });
-    }
-
-    try {
-        let items;
-        let totalCleared = 0;
-        const clearedItems = [];
-        
-        if (weight) {
-            // Списываем конкретную граммовку
-            items = runQuery('SELECT * FROM inventory WHERE brand = ? AND flavor = ? AND weight = ?', [brand, flavor, weight]);
-        } else {
-            // Списываем все граммовки этого вкуса
-            items = runQuery('SELECT * FROM inventory WHERE brand = ? AND flavor = ?', [brand, flavor]);
-        }
-        
-        if (items.length === 0) {
-            return res.status(400).json({ error: 'Позиция не найдена' });
-        }
-        
-        items.forEach(item => {
-            if (item.packs > 0) {
-                const cleared = item.packs;
-                db.run('UPDATE inventory SET packs = 0, updated_at = datetime("now") WHERE id = ?', [item.id]);
-                
-                const message = `🗑️ ВЫБИТО: ${item.brand} "${item.flavor}" ${item.weight}г (списано ${cleared} уп.)`;
-                db.run('INSERT INTO logs (type, brand, flavor, weight, quantity, message, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))', 
-                       ['CLEAR', item.brand, item.flavor, item.weight, -cleared, message]);
-                
-                totalCleared += cleared;
-                clearedItems.push(item);
-            }
-        });
-        
-        saveDatabase();
-        
-        res.json({ 
-            success: true, 
-            message: `Выбито с полки: ${brand} "${flavor}" - ${totalCleared} уп.`,
-            totalCleared: totalCleared,
-            items: clearedItems
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// 🗑️ СПИСАНИЕ ВСЕХ ОСТАТКОВ БРЕНДА
-app.post('/api/clear-brand', (req, res) => {
-    const { brand } = req.body;
-    
-    if (!brand) {
-        return res.status(400).json({ error: 'Укажите бренд' });
-    }
-
-    try {
-        const items = runQuery('SELECT * FROM inventory WHERE brand = ? AND packs > 0', [brand]);
-        
-        if (items.length === 0) {
-            return res.status(400).json({ error: 'Нет активных позиций этого бренда' });
-        }
-        
-        let totalCleared = 0;
-        
-        items.forEach(item => {
-            const cleared = item.packs;
-            db.run('UPDATE inventory SET packs = 0, updated_at = datetime("now") WHERE id = ?', [item.id]);
-            
-            const message = `🗑️ ВЫБИТ БРЕНД: ${item.brand} "${item.flavor}" ${item.weight}г (списано ${cleared} уп.)`;
-            db.run('INSERT INTO logs (type, brand, flavor, weight, quantity, message, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))', 
-                   ['CLEAR_BRAND', item.brand, item.flavor, item.weight, -cleared, message]);
-            
-            totalCleared += cleared;
-        });
-        
-        saveDatabase();
-        
-        res.json({ 
-            success: true, 
-            message: `Бренд ${brand} полностью выбит! Списано ${totalCleared} уп.`,
-            totalCleared: totalCleared
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ❤️ ПРОВЕРКА РАБОТЫ
+// ❤️ ПРОВЕРКА
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'ok', 
@@ -475,7 +519,7 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// 🚀 ЗАПУСК СЕРВЕРА
+// 🚀 ЗАПУСК
 async function startServer() {
     await initDatabase();
     app.listen(PORT, () => {
