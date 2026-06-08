@@ -104,7 +104,6 @@
             <h1 style="font-size:4em;margin-bottom:10px;">🫧</h1>
             <h2>Hookah Stock Manager</h2>
             <p class="hint">
-                Для входа сотрудника:<br><span>HP Life / flavorteam</span><br><br>
                 Для ознакомительного просмотра:<br><span>test / test</span>
             </p>
             <div class="input-group">
@@ -196,7 +195,6 @@
         var allItems = [];
         var clearTarget = null;
 
-        // Проверка сохранённой сессии
         var savedToken = localStorage.getItem('hookah_token');
         var savedUser = localStorage.getItem('hookah_user');
         if (savedToken && savedUser) {
@@ -355,16 +353,14 @@
             else { stockCount.style.display = 'none'; }
 
             var isAdmin = currentUser && currentUser.role === 'admin';
-            var actionsHTML = '';
 
             container.innerHTML = sorted.map(function(item) {
+                var actionsHTML = '';
                 if (isAdmin && item.packs > 0) {
                     actionsHTML = '<div class="card-actions">' +
                         '<button class="btn-sm btn-clear-one" onclick="confirmClearPosition(\'' + escapeHtml(item.brand) + '\', \'' + escapeHtml(item.flavor) + '\', ' + item.weight + ')">🗑️ Выбить эту</button>' +
                         '<button class="btn-sm btn-clear-all" onclick="confirmClearFlavor(\'' + escapeHtml(item.brand) + '\', \'' + escapeHtml(item.flavor) + '\')">💀 Выбить вкус полностью</button>' +
                         '</div>';
-                } else {
-                    actionsHTML = '';
                 }
                 
                 return '<div class="card ' + (item.packs === 0 ? 'out-of-stock' : '') + '">' +
