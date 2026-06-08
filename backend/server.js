@@ -75,6 +75,7 @@ async function initDatabase() {
             flavor TEXT NOT NULL,
             weight INTEGER NOT NULL,
             packs INTEGER DEFAULT 0,
+            tags TEXT DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -92,6 +93,48 @@ async function initDatabase() {
             message TEXT
         )
     `);
+    
+    db.run(`
+        CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            color TEXT DEFAULT '#BB86FC'
+        )
+    `);
+    
+    // Предустановленные теги
+    const defaultTags = [
+        ['Малина', '#FF5252'],
+        ['Черника', '#448AFF'],
+        ['Грейпфрут', '#FF9100'],
+        ['Лимон', '#FFEB3B'],
+        ['Мята', '#00E676'],
+        ['Арбуз', '#FF4081'],
+        ['Дыня', '#FFC107'],
+        ['Клубника', '#E91E63'],
+        ['Виноград', '#9C27B0'],
+        ['Апельсин', '#FF9800'],
+        ['Манго', '#FFAB40'],
+        ['Кокос', '#8D6E63'],
+        ['Ваниль', '#FFE0B2'],
+        ['Шоколад', '#795548'],
+        ['Карамель', '#FF8A65'],
+        ['Кофе', '#6D4C41'],
+        ['Лайм', '#CDDC39'],
+        ['Персик', '#FFCCBC'],
+        ['Яблоко', '#4CAF50'],
+        ['Груша', '#C0CA33'],
+        ['Вишня', '#D32F2F'],
+        ['Банан', '#FDD835'],
+        ['Киви', '#AED581'],
+        ['Маракуйя', '#F9A825'],
+        ['Ананас', '#FBC02D']
+    ];
+    
+    const insertTag = db.prepare('INSERT OR IGNORE INTO tags (name, color) VALUES (?, ?)');
+    defaultTags.forEach(tag => {
+        insertTag.run(tag);
+    });
     
     console.log('✅ Таблицы готовы');
     saveDatabase();
@@ -154,17 +197,46 @@ app.post('/api/login', (req, res) => {
     });
 });
 
-// 🔵 СКЛАД (чтение)
+// 🏷️ ПОЛУЧИТЬ ВСЕ ТЕГИ
+app.get('/api/tags', authMiddleware, (req, res) => {
+    try {
+        const tags = runQuery('SELECT * FROM tags ORDER BY name');
+        res.json(tags);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 🏷️ ДОБАВИТЬ ТЕГ (админ)
+app.post('/api/tags', authMiddleware, requireAdmin, (req, res) => {
+    const { name, color } = req.body;
+    if (!name) return res.status(400).json({ error: 'Укажите название тега' });
+    
+    try {
+        db.run('INSERT OR IGNORE INTO tags (name, color) VALUES (?, ?)', [name, color || '#BB86FC']);
+        saveDatabase();
+        const tag = runQuery('SELECT * FROM tags WHERE name = ?', [name])[0];
+        res.json({ success: true, tag: tag });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 🔵 СКЛАД
 app.get('/api/inventory', authMiddleware, (req, res) => {
     try {
         const items = runQuery('SELECT * FROM inventory ORDER BY brand, flavor');
+        // Парсим теги для каждого item
+        items.forEach(item => {
+            item.tagsArray = item.tags ? item.tags.split(',').filter(t => t) : [];
+        });
         res.json(items);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 🔵 БРЕНДЫ (чтение)
+// 🔵 БРЕНДЫ
 app.get('/api/brands', authMiddleware, (req, res) => {
     try {
         const brands = runQuery('SELECT DISTINCT brand FROM inventory ORDER BY brand');
@@ -174,7 +246,7 @@ app.get('/api/brands', authMiddleware, (req, res) => {
     }
 });
 
-// 🔵 ВКУСЫ БРЕНДА (чтение)
+// 🔵 ВКУСЫ БРЕНДА
 app.get('/api/flavors/:brand', authMiddleware, (req, res) => {
     try {
         const brand = decodeURIComponent(req.params.brand);
@@ -185,7 +257,7 @@ app.get('/api/flavors/:brand', authMiddleware, (req, res) => {
     }
 });
 
-// 🔵 ГРАММОВКИ (чтение)
+// 🔵 ГРАММОВКИ
 app.get('/api/weights/:brand/:flavor', authMiddleware, (req, res) => {
     try {
         const brand = decodeURIComponent(req.params.brand);
@@ -197,23 +269,24 @@ app.get('/api/weights/:brand/:flavor', authMiddleware, (req, res) => {
     }
 });
 
-// 🟢 ЗАКУП (только админ)
+// 🟢 ЗАКУП
 app.post('/api/buy', authMiddleware, requireAdmin, (req, res) => {
-    const { brand, flavor, weight, quantity } = req.body;
+    const { brand, flavor, weight, quantity, tags } = req.body;
     
     if (!brand || !flavor || !weight || !quantity || quantity <= 0) {
         return res.status(400).json({ error: 'Заполните все поля корректно' });
     }
 
     const id = `${brand}::${flavor}::${weight}`;
+    const tagsStr = tags ? tags.join(',') : '';
 
     try {
         const existing = runQuery('SELECT * FROM inventory WHERE id = ?', [id]);
         
         if (existing.length > 0) {
-            db.run('UPDATE inventory SET packs = packs + ?, updated_at = datetime("now") WHERE id = ?', [quantity, id]);
+            db.run('UPDATE inventory SET packs = packs + ?, tags = ?, updated_at = datetime("now") WHERE id = ?', [quantity, tagsStr, id]);
         } else {
-            db.run('INSERT INTO inventory (id, brand, flavor, weight, packs, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime("now"), datetime("now"))', [id, brand, flavor, weight, quantity]);
+            db.run('INSERT INTO inventory (id, brand, flavor, weight, packs, tags, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime("now"), datetime("now"))', [id, brand, flavor, weight, quantity, tagsStr]);
         }
 
         const message = `📥 ЗАКУП: ${brand} "${flavor}" ${weight}г (+${quantity} уп.)`;
@@ -222,13 +295,14 @@ app.post('/api/buy', authMiddleware, requireAdmin, (req, res) => {
         saveDatabase();
         
         const updatedItem = runQuery('SELECT * FROM inventory WHERE id = ?', [id])[0];
+        updatedItem.tagsArray = updatedItem.tags ? updatedItem.tags.split(',').filter(t => t) : [];
         res.json({ success: true, item: updatedItem, message: 'Закуп выполнен!' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 🔴 РАСХОД (только админ)
+// 🔴 РАСХОД
 app.post('/api/spend', authMiddleware, requireAdmin, (req, res) => {
     const { brand, flavor, weight, quantity } = req.body;
     
@@ -255,13 +329,14 @@ app.post('/api/spend', authMiddleware, requireAdmin, (req, res) => {
         saveDatabase();
         
         const updatedItem = runQuery('SELECT * FROM inventory WHERE id = ?', [id])[0];
+        updatedItem.tagsArray = updatedItem.tags ? updatedItem.tags.split(',').filter(t => t) : [];
         res.json({ success: true, item: updatedItem, message: 'Расход записан!' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 🗑️ ВЫБИТЬ ПОЗИЦИЮ (только админ)
+// 🗑️ ВЫБИТЬ ПОЗИЦИЮ
 app.post('/api/clear-position', authMiddleware, requireAdmin, (req, res) => {
     const { brand, flavor, weight } = req.body;
     
@@ -307,7 +382,7 @@ app.post('/api/clear-position', authMiddleware, requireAdmin, (req, res) => {
     }
 });
 
-// 🗑️ ВЫБИТЬ БРЕНД (только админ)
+// 🗑️ ВЫБИТЬ БРЕНД
 app.post('/api/clear-brand', authMiddleware, requireAdmin, (req, res) => {
     const { brand } = req.body;
     
@@ -346,7 +421,7 @@ app.post('/api/clear-brand', authMiddleware, requireAdmin, (req, res) => {
     }
 });
 
-// 📊 СТАТИСТИКА (чтение)
+// 📊 СТАТИСТИКА
 app.get('/api/statistics', authMiddleware, (req, res) => {
     try {
         const topSpent = runQuery(`
@@ -374,7 +449,6 @@ app.get('/api/statistics', authMiddleware, (req, res) => {
     }
 });
 
-// 📊 ДЕТАЛИ ПО БРЕНДАМ (чтение)
 app.get('/api/statistics/brands', authMiddleware, (req, res) => {
     try {
         const brands = runQuery(`
@@ -395,7 +469,6 @@ app.get('/api/statistics/brands', authMiddleware, (req, res) => {
     }
 });
 
-// 📊 ДЕТАЛИ ПО ВКУСАМ (чтение)
 app.get('/api/statistics/flavors', authMiddleware, (req, res) => {
     try {
         const flavors = runQuery(`
@@ -404,38 +477,45 @@ app.get('/api/statistics/flavors', authMiddleware, (req, res) => {
                 flavor,
                 SUM(packs) as total_packs,
                 SUM(packs * weight) as total_grams,
-                GROUP_CONCAT(DISTINCT weight) as weights
+                GROUP_CONCAT(DISTINCT weight) as weights,
+                tags
             FROM inventory
             GROUP BY brand, flavor
             ORDER BY brand, flavor
         `);
+        flavors.forEach(f => {
+            f.tagsArray = f.tags ? f.tags.split(',').filter(t => t) : [];
+        });
         res.json(flavors);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 📊 В НАЛИЧИИ (чтение)
 app.get('/api/statistics/in-stock', authMiddleware, (req, res) => {
     try {
         const items = runQuery(`SELECT * FROM inventory WHERE packs > 0 ORDER BY brand, flavor, weight`);
+        items.forEach(item => {
+            item.tagsArray = item.tags ? item.tags.split(',').filter(t => t) : [];
+        });
         res.json(items);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 📊 ВЫБЫВШИЕ (чтение)
 app.get('/api/statistics/out-of-stock', authMiddleware, (req, res) => {
     try {
         const items = runQuery(`SELECT * FROM inventory WHERE packs = 0 ORDER BY brand, flavor, weight`);
+        items.forEach(item => {
+            item.tagsArray = item.tags ? item.tags.split(',').filter(t => t) : [];
+        });
         res.json(items);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// 📊 ПО ГРАММОВКАМ (чтение)
 app.get('/api/statistics/weights', authMiddleware, (req, res) => {
     try {
         const weights = runQuery(`
@@ -455,7 +535,7 @@ app.get('/api/statistics/weights', authMiddleware, (req, res) => {
     }
 });
 
-// 📥 EXCEL (чтение)
+// 📥 EXCEL
 app.get('/api/export/excel', authMiddleware, (req, res) => {
     try {
         const inventory = runQuery('SELECT * FROM inventory ORDER BY brand, flavor, weight');
@@ -469,6 +549,7 @@ app.get('/api/export/excel', authMiddleware, (req, res) => {
             'Граммовка (г)': item.weight,
             'Упаковок': item.packs,
             'Всего грамм': item.packs * item.weight,
+            'Теги': item.tags || '',
             'Статус': item.packs > 0 ? 'В наличии' : 'Выбыл'
         }));
         
@@ -499,7 +580,7 @@ app.get('/api/export/excel', authMiddleware, (req, res) => {
     }
 });
 
-// 📜 ИСТОРИЯ (чтение)
+// 📜 ИСТОРИЯ
 app.get('/api/logs', authMiddleware, (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 100;
@@ -524,8 +605,6 @@ async function startServer() {
     await initDatabase();
     app.listen(PORT, () => {
         console.log(`🚀 Сервер запущен на порту ${PORT}`);
-        console.log(`📍 http://localhost:${PORT}`);
-        console.log(`📊 http://localhost:${PORT}/api/health`);
     });
 }
 
