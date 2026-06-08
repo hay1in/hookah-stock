@@ -374,6 +374,98 @@ app.get('/api/logs', (req, res) => {
     }
 });
 
+// 🗑️ СПИСАНИЕ ВСЕХ ОСТАТКОВ ПОЗИЦИИ
+app.post('/api/clear-position', (req, res) => {
+    const { brand, flavor, weight } = req.body;
+    
+    if (!brand || !flavor) {
+        return res.status(400).json({ error: 'Укажите бренд и вкус' });
+    }
+
+    try {
+        let items;
+        let totalCleared = 0;
+        const clearedItems = [];
+        
+        if (weight) {
+            // Списываем конкретную граммовку
+            items = runQuery('SELECT * FROM inventory WHERE brand = ? AND flavor = ? AND weight = ?', [brand, flavor, weight]);
+        } else {
+            // Списываем все граммовки этого вкуса
+            items = runQuery('SELECT * FROM inventory WHERE brand = ? AND flavor = ?', [brand, flavor]);
+        }
+        
+        if (items.length === 0) {
+            return res.status(400).json({ error: 'Позиция не найдена' });
+        }
+        
+        items.forEach(item => {
+            if (item.packs > 0) {
+                const cleared = item.packs;
+                db.run('UPDATE inventory SET packs = 0, updated_at = datetime("now") WHERE id = ?', [item.id]);
+                
+                const message = `🗑️ ВЫБИТО: ${item.brand} "${item.flavor}" ${item.weight}г (списано ${cleared} уп.)`;
+                db.run('INSERT INTO logs (type, brand, flavor, weight, quantity, message, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))', 
+                       ['CLEAR', item.brand, item.flavor, item.weight, -cleared, message]);
+                
+                totalCleared += cleared;
+                clearedItems.push(item);
+            }
+        });
+        
+        saveDatabase();
+        
+        res.json({ 
+            success: true, 
+            message: `Выбито с полки: ${brand} "${flavor}" - ${totalCleared} уп.`,
+            totalCleared: totalCleared,
+            items: clearedItems
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 🗑️ СПИСАНИЕ ВСЕХ ОСТАТКОВ БРЕНДА
+app.post('/api/clear-brand', (req, res) => {
+    const { brand } = req.body;
+    
+    if (!brand) {
+        return res.status(400).json({ error: 'Укажите бренд' });
+    }
+
+    try {
+        const items = runQuery('SELECT * FROM inventory WHERE brand = ? AND packs > 0', [brand]);
+        
+        if (items.length === 0) {
+            return res.status(400).json({ error: 'Нет активных позиций этого бренда' });
+        }
+        
+        let totalCleared = 0;
+        
+        items.forEach(item => {
+            const cleared = item.packs;
+            db.run('UPDATE inventory SET packs = 0, updated_at = datetime("now") WHERE id = ?', [item.id]);
+            
+            const message = `🗑️ ВЫБИТ БРЕНД: ${item.brand} "${item.flavor}" ${item.weight}г (списано ${cleared} уп.)`;
+            db.run('INSERT INTO logs (type, brand, flavor, weight, quantity, message, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))', 
+                   ['CLEAR_BRAND', item.brand, item.flavor, item.weight, -cleared, message]);
+            
+            totalCleared += cleared;
+        });
+        
+        saveDatabase();
+        
+        res.json({ 
+            success: true, 
+            message: `Бренд ${brand} полностью выбит! Списано ${totalCleared} уп.`,
+            totalCleared: totalCleared
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ❤️ ПРОВЕРКА РАБОТЫ
 app.get('/api/health', (req, res) => {
     res.json({ 
