@@ -7,36 +7,30 @@ const XLSX = require('xlsx');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Настройка безопасности
 app.use(cors());
 app.use(express.json());
 
-// Подключаем SQL.js
 const initSqlJs = require('sql.js');
 let db;
 
-// Инициализация базы данных
 async function initDatabase() {
     const SQL = await initSqlJs();
-    
-    // Пытаемся загрузить существующую базу или создаём новую
     const dbPath = path.join(__dirname, 'hookah.db');
     
     try {
         if (fs.existsSync(dbPath)) {
             const fileBuffer = fs.readFileSync(dbPath);
             db = new SQL.Database(fileBuffer);
-            console.log('✅ База данных загружена с диска');
+            console.log('✅ База данных загружена');
         } else {
             db = new SQL.Database();
             console.log('✅ Создана новая база данных');
         }
     } catch (error) {
-        console.log('⚠️ Ошибка загрузки, создаю новую базу:', error.message);
         db = new SQL.Database();
+        console.log('✅ Создана новая база данных (после ошибки)');
     }
     
-    // Создаём таблицы
     db.run(`
         CREATE TABLE IF NOT EXISTS inventory (
             id TEXT PRIMARY KEY,
@@ -66,27 +60,14 @@ async function initDatabase() {
     saveDatabase();
 }
 
-// Сохранение базы на диск
 function saveDatabase() {
     try {
         const data = db.export();
         const buffer = Buffer.from(data);
         fs.writeFileSync(path.join(__dirname, 'hookah.db'), buffer);
     } catch (error) {
-        console.error('❌ Ошибка сохранения базы:', error);
+        console.error('❌ Ошибка сохранения:', error);
     }
-}
-
-// Вспомогательные функции для конвертации результатов
-function rowToObject(row) {
-    if (!row || !row.columns || !row.values) {
-        return {};
-    }
-    const obj = {};
-    for (let i = 0; i < row.columns.length; i++) {
-        obj[row.columns[i]] = row.values[i];
-    }
-    return obj;
 }
 
 function runQuery(sql, params = []) {
@@ -138,10 +119,7 @@ app.get('/api/brands', (req, res) => {
 app.get('/api/flavors/:brand', (req, res) => {
     try {
         const brand = decodeURIComponent(req.params.brand);
-        const flavors = runQuery(
-            'SELECT DISTINCT flavor FROM inventory WHERE brand = ? ORDER BY flavor',
-            [brand]
-        );
+        const flavors = runQuery('SELECT DISTINCT flavor FROM inventory WHERE brand = ? ORDER BY flavor', [brand]);
         res.json(flavors.map(f => f.flavor));
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -153,10 +131,7 @@ app.get('/api/weights/:brand/:flavor', (req, res) => {
     try {
         const brand = decodeURIComponent(req.params.brand);
         const flavor = decodeURIComponent(req.params.flavor);
-        const weights = runQuery(
-            'SELECT DISTINCT weight FROM inventory WHERE brand = ? AND flavor = ? ORDER BY weight',
-            [brand, flavor]
-        );
+        const weights = runQuery('SELECT DISTINCT weight FROM inventory WHERE brand = ? AND flavor = ? ORDER BY weight', [brand, flavor]);
         res.json(weights.map(w => w.weight));
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -174,21 +149,16 @@ app.post('/api/buy', (req, res) => {
     const id = `${brand}::${flavor}::${weight}`;
 
     try {
-        // Проверяем существование записи
         const existing = runQuery('SELECT * FROM inventory WHERE id = ?', [id]);
         
         if (existing.length > 0) {
-            db.run('UPDATE inventory SET packs = packs + ?, updated_at = datetime("now") WHERE id = ?', 
-                   [quantity, id]);
+            db.run('UPDATE inventory SET packs = packs + ?, updated_at = datetime("now") WHERE id = ?', [quantity, id]);
         } else {
-            db.run('INSERT INTO inventory (id, brand, flavor, weight, packs, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime("now"), datetime("now"))',
-                   [id, brand, flavor, weight, quantity]);
+            db.run('INSERT INTO inventory (id, brand, flavor, weight, packs, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime("now"), datetime("now"))', [id, brand, flavor, weight, quantity]);
         }
 
-        // Добавляем в логи
         const message = `📥 ЗАКУП: ${brand} "${flavor}" ${weight}г (+${quantity} уп.)`;
-        db.run('INSERT INTO logs (type, brand, flavor, weight, quantity, message, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))',
-               ['BUY', brand, flavor, weight, quantity, message]);
+        db.run('INSERT INTO logs (type, brand, flavor, weight, quantity, message, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))', ['BUY', brand, flavor, weight, quantity, message]);
 
         saveDatabase();
         
@@ -218,12 +188,10 @@ app.post('/api/spend', (req, res) => {
             });
         }
 
-        db.run('UPDATE inventory SET packs = packs - ?, updated_at = datetime("now") WHERE id = ?',
-               [quantity, id]);
+        db.run('UPDATE inventory SET packs = packs - ?, updated_at = datetime("now") WHERE id = ?', [quantity, id]);
 
         const message = `📤 РАСХОД: ${brand} "${flavor}" ${weight}г (-${quantity} уп.)`;
-        db.run('INSERT INTO logs (type, brand, flavor, weight, quantity, message, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))',
-               ['SPEND', brand, flavor, weight, -quantity, message]);
+        db.run('INSERT INTO logs (type, brand, flavor, weight, quantity, message, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))', ['SPEND', brand, flavor, weight, -quantity, message]);
 
         saveDatabase();
         
@@ -234,10 +202,9 @@ app.post('/api/spend', (req, res) => {
     }
 });
 
-// 📊 СТАТИСТИКА
+// 📊 ОСНОВНАЯ СТАТИСТИКА
 app.get('/api/statistics', (req, res) => {
     try {
-        // Топ-10 самых расходуемых вкусов
         const topSpent = runQuery(`
             SELECT brand, flavor, SUM(ABS(quantity)) as total_spent
             FROM logs 
@@ -247,7 +214,6 @@ app.get('/api/statistics', (req, res) => {
             LIMIT 10
         `);
 
-        // Общая статистика
         const stats = runQuery(`
             SELECT 
                 COUNT(DISTINCT brand) as total_brands,
@@ -258,24 +224,96 @@ app.get('/api/statistics', (req, res) => {
             FROM inventory
         `)[0] || { total_brands: 0, total_flavors: 0, in_stock_items: 0, out_of_stock_items: 0, total_grams_in_stock: 0 };
 
-        // Расход по месяцам
-        const monthlyStats = runQuery(`
-            SELECT 
-                strftime('%Y-%m', timestamp) as month,
-                COUNT(*) as operations,
-                SUM(CASE WHEN type='BUY' THEN quantity ELSE 0 END) as total_bought,
-                SUM(CASE WHEN type='SPEND' THEN ABS(quantity) ELSE 0 END) as total_spent
-            FROM logs
-            GROUP BY month
-            ORDER BY month DESC
-            LIMIT 12
-        `);
+        res.json({ topSpent, stats });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
-        res.json({
-            topSpent,
-            stats,
-            monthlyStats
-        });
+// 📊 ДЕТАЛЬНАЯ СТАТИСТИКА ПО БРЕНДАМ
+app.get('/api/statistics/brands', (req, res) => {
+    try {
+        const brands = runQuery(`
+            SELECT 
+                brand,
+                COUNT(DISTINCT flavor) as total_flavors,
+                SUM(packs) as total_packs,
+                SUM(packs * weight) as total_grams,
+                SUM(CASE WHEN packs > 0 THEN 1 ELSE 0 END) as in_stock,
+                SUM(CASE WHEN packs = 0 THEN 1 ELSE 0 END) as out_of_stock
+            FROM inventory
+            GROUP BY brand
+            ORDER BY brand
+        `);
+        res.json(brands);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 📊 ДЕТАЛЬНАЯ СТАТИСТИКА ПО ВКУСАМ
+app.get('/api/statistics/flavors', (req, res) => {
+    try {
+        const flavors = runQuery(`
+            SELECT 
+                brand,
+                flavor,
+                SUM(packs) as total_packs,
+                SUM(packs * weight) as total_grams,
+                GROUP_CONCAT(DISTINCT weight) as weights
+            FROM inventory
+            GROUP BY brand, flavor
+            ORDER BY brand, flavor
+        `);
+        res.json(flavors);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 📊 ПОЗИЦИИ В НАЛИЧИИ
+app.get('/api/statistics/in-stock', (req, res) => {
+    try {
+        const items = runQuery(`
+            SELECT * FROM inventory 
+            WHERE packs > 0 
+            ORDER BY brand, flavor, weight
+        `);
+        res.json(items);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 📊 ВЫБЫВШИЕ ПОЗИЦИИ
+app.get('/api/statistics/out-of-stock', (req, res) => {
+    try {
+        const items = runQuery(`
+            SELECT * FROM inventory 
+            WHERE packs = 0 
+            ORDER BY brand, flavor, weight
+        `);
+        res.json(items);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 📊 СТАТИСТИКА ПО ГРАММОВКАМ
+app.get('/api/statistics/weights', (req, res) => {
+    try {
+        const weights = runQuery(`
+            SELECT 
+                weight,
+                COUNT(*) as total_items,
+                SUM(packs) as total_packs,
+                SUM(packs * weight) as total_grams,
+                SUM(CASE WHEN packs > 0 THEN 1 ELSE 0 END) as in_stock
+            FROM inventory
+            GROUP BY weight
+            ORDER BY weight
+        `);
+        res.json(weights);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -289,21 +327,18 @@ app.get('/api/export/excel', (req, res) => {
         
         const workbook = XLSX.utils.book_new();
         
-        // Лист 1: Склад
         const inventoryData = inventory.map(item => ({
             'Бренд': item.brand,
             'Вкус': item.flavor,
             'Граммовка (г)': item.weight,
             'Упаковок': item.packs,
             'Всего грамм': item.packs * item.weight,
-            'Статус': item.packs > 0 ? 'В наличии' : 'Выбыл',
-            'Последнее обновление': item.updated_at
+            'Статус': item.packs > 0 ? 'В наличии' : 'Выбыл'
         }));
         
         const ws1 = XLSX.utils.json_to_sheet(inventoryData);
         XLSX.utils.book_append_sheet(workbook, ws1, 'Склад');
         
-        // Лист 2: История операций
         const logsData = logs.map(log => ({
             'Дата': log.timestamp,
             'Тип': log.type === 'BUY' ? 'Закуп' : 'Расход',
@@ -328,7 +363,7 @@ app.get('/api/export/excel', (req, res) => {
     }
 });
 
-// 📜 История операций
+// 📜 ИСТОРИЯ ОПЕРАЦИЙ
 app.get('/api/logs', (req, res) => {
     try {
         const limit = parseInt(req.query.limit) || 100;
@@ -339,7 +374,7 @@ app.get('/api/logs', (req, res) => {
     }
 });
 
-// ❤️ Проверка работы сервера
+// ❤️ ПРОВЕРКА РАБОТЫ
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'ok', 
@@ -348,13 +383,13 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Запуск сервера
+// 🚀 ЗАПУСК СЕРВЕРА
 async function startServer() {
     await initDatabase();
     app.listen(PORT, () => {
         console.log(`🚀 Сервер запущен на порту ${PORT}`);
-        console.log(`📍 Локальный адрес: http://localhost:${PORT}`);
-        console.log(`📊 Проверка: http://localhost:${PORT}/api/health`);
+        console.log(`📍 http://localhost:${PORT}`);
+        console.log(`📊 http://localhost:${PORT}/api/health`);
     });
 }
 
