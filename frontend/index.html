@@ -26,7 +26,6 @@
             padding: 20px;
         }
 
-        /* Шапка */
         .header {
             background: rgba(30, 27, 46, 0.95);
             backdrop-filter: blur(20px);
@@ -72,7 +71,6 @@
             border-color: rgba(255, 82, 82, 0.3);
         }
 
-        /* Вкладки */
         .tabs {
             display: flex;
             gap: 10px;
@@ -117,7 +115,6 @@
             margin-left: 8px;
         }
 
-        /* Кнопки действий */
         .actions {
             display: flex;
             gap: 15px;
@@ -155,11 +152,6 @@
             color: white;
         }
 
-        .btn-stat {
-            background: linear-gradient(135deg, #FF6D00, #FF9100);
-            color: #0f0c29;
-        }
-
         .btn:hover {
             transform: translateY(-3px);
             box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
@@ -169,7 +161,6 @@
             transform: translateY(-1px);
         }
 
-        /* Поиск */
         .search-bar {
             background: rgba(30, 27, 46, 0.9);
             backdrop-filter: blur(20px);
@@ -196,7 +187,6 @@
             box-shadow: 0 0 20px rgba(187, 134, 252, 0.2);
         }
 
-        /* Карточки товаров */
         .inventory-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -322,6 +312,113 @@
             box-shadow: 0 5px 15px rgba(255, 82, 82, 0.4);
         }
 
+        /* СТАТИСТИКА */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+            margin-bottom: 35px;
+        }
+
+        .stat-card {
+            background: rgba(30, 27, 46, 0.9);
+            backdrop-filter: blur(20px);
+            padding: 25px;
+            border-radius: 20px;
+            border: 1px solid rgba(187, 134, 252, 0.2);
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+            border-color: rgba(187, 134, 252, 0.5);
+            background: rgba(40, 35, 60, 0.95);
+        }
+
+        .stat-icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 2.2em;
+            font-weight: 700;
+            background: linear-gradient(135deg, #BB86FC, #64FFDA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            color: #9E9E9E;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-hint {
+            color: #64FFDA;
+            font-size: 0.75em;
+            margin-top: 8px;
+        }
+
+        .stat-hint.warning {
+            color: #FF5252;
+        }
+
+        /* Таблица деталей */
+        .detail-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(30, 27, 46, 0.9);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .detail-table th {
+            padding: 14px;
+            text-align: left;
+            color: #BB86FC;
+            background: rgba(187, 134, 252, 0.1);
+            border-bottom: 2px solid #3D2F5C;
+            font-weight: 600;
+        }
+
+        .detail-table td {
+            padding: 12px 14px;
+            color: #E8E6F0;
+            border-bottom: 1px solid #2D1F3D;
+        }
+
+        .detail-table tr:hover td {
+            background: rgba(187, 134, 252, 0.05);
+        }
+
+        .log-entry {
+            background: rgba(30, 27, 46, 0.9);
+            backdrop-filter: blur(20px);
+            padding: 16px 22px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(187, 134, 252, 0.2);
+            transition: all 0.3s;
+        }
+
+        .log-entry:hover {
+            background: rgba(187, 134, 252, 0.05);
+        }
+
+        .log-time {
+            color: #BB86FC;
+            font-weight: 600;
+            margin-right: 12px;
+            font-size: 0.9em;
+        }
+
         /* Модальное окно */
         .modal {
             display: none;
@@ -405,73 +502,6 @@
             flex: 2;
         }
 
-        /* Статистика */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 18px;
-            margin-bottom: 35px;
-        }
-
-        .stat-card {
-            background: rgba(30, 27, 46, 0.9);
-            backdrop-filter: blur(20px);
-            padding: 25px;
-            border-radius: 20px;
-            border: 1px solid rgba(187, 134, 252, 0.2);
-            text-align: center;
-            transition: all 0.3s;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
-            border-color: rgba(187, 134, 252, 0.5);
-        }
-
-        .stat-icon {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-
-        .stat-value {
-            font-size: 2.2em;
-            font-weight: 700;
-            background: linear-gradient(135deg, #BB86FC, #64FFDA);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin: 10px 0;
-        }
-
-        .stat-label {
-            color: #9E9E9E;
-            font-size: 0.9em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .log-entry {
-            background: rgba(30, 27, 46, 0.9);
-            backdrop-filter: blur(20px);
-            padding: 16px 22px;
-            border-radius: 15px;
-            margin-bottom: 10px;
-            border: 1px solid rgba(187, 134, 252, 0.2);
-            transition: all 0.3s;
-        }
-
-        .log-entry:hover {
-            background: rgba(187, 134, 252, 0.05);
-        }
-
-        .log-time {
-            color: #BB86FC;
-            font-weight: 600;
-            margin-right: 12px;
-            font-size: 0.9em;
-        }
-
         .toast {
             position: fixed;
             bottom: 30px;
@@ -497,7 +527,20 @@
             box-shadow: 0 10px 25px rgba(255, 82, 82, 0.3);
         }
 
-        /* Адаптивность */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(187, 134, 252, 0.2);
+            border-radius: 50%;
+            border-top-color: #BB86FC;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -528,21 +571,6 @@
                 padding: 25px;
             }
         }
-
-        /* Анимация загрузки */
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(187, 134, 252, 0.2);
-            border-radius: 50%;
-            border-top-color: #BB86FC;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body>
@@ -567,7 +595,7 @@
             <button class="tab-btn" onclick="switchTab('log')">📋 История</button>
         </div>
 
-        <!-- Склад -->
+        <!-- СКЛАД -->
         <div id="stockView">
             <div class="search-bar">
                 <input type="text" class="search-input" placeholder="🔍 Поиск по бренду или вкусу..." 
@@ -579,21 +607,34 @@
                 <button class="btn btn-export" onclick="exportToExcel()">📥 Скачать Excel</button>
             </div>
             <div class="inventory-grid" id="inventoryContainer">
-                <div style="text-align:center;padding:50px;color:#9E9E9E;">
+                <div style="text-align:center;padding:50px;color:#9E9E9E;grid-column:1/-1;">
                     <div class="loading"></div>
                     <p style="margin-top:20px;">Загрузка склада...</p>
                 </div>
             </div>
         </div>
 
-        <!-- Статистика -->
+        <!-- СТАТИСТИКА -->
         <div id="statsView" style="display: none;">
             <div class="stats-grid" id="statsContainer"></div>
-            <h3 style="margin: 25px 0; color: #BB86FC;">🔝 Топ-10 расходуемых вкусов</h3>
-            <div id="topSpentContainer"></div>
+            
+            <div id="detailView" style="display:none; margin-top: 25px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:15px;">
+                    <h3 style="color: #BB86FC; margin:0;" id="detailTitle">Детали</h3>
+                    <button class="btn btn-cancel" onclick="closeDetail()" style="padding:10px 20px; font-size:0.85em;">
+                        ← Назад к статистике
+                    </button>
+                </div>
+                <div id="detailContent" style="overflow-x:auto;"></div>
+            </div>
+            
+            <div id="topSpentSection">
+                <h3 style="margin: 25px 0; color: #BB86FC;">🔝 Топ-10 расходуемых вкусов</h3>
+                <div id="topSpentContainer"></div>
+            </div>
         </div>
 
-        <!-- История -->
+        <!-- ИСТОРИЯ -->
         <div id="logView" style="display: none;">
             <div id="logContainer">
                 <div style="text-align:center;padding:50px;color:#9E9E9E;">
@@ -604,7 +645,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно -->
+    <!-- МОДАЛЬНОЕ ОКНО -->
     <div class="modal" id="operationModal">
         <div class="modal-content">
             <h2 id="modalTitle">Операция</h2>
@@ -651,16 +692,14 @@
         </div>
     </div>
 
-    <!-- Toast уведомления -->
+    <!-- УВЕДОМЛЕНИЯ -->
     <div class="toast" id="toast"></div>
 
     <script>
-        // API URL
         const API_URL = 'https://hookah-api.onrender.com/api';
         let currentMode = 'buy';
         let allItems = [];
 
-        // Toast уведомления
         function showToast(message, isError = false) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
@@ -670,7 +709,6 @@
             }, 3000);
         }
 
-        // Проверка подключения
         async function checkConnection() {
             const badge = document.getElementById('statusBadge');
             try {
@@ -687,7 +725,6 @@
             }
         }
 
-        // Переключение вкладок
         function switchTab(tab) {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('stockView').style.display = 'none';
@@ -701,6 +738,8 @@
             } else if (tab === 'stats') {
                 document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
                 document.getElementById('statsView').style.display = 'block';
+                document.getElementById('detailView').style.display = 'none';
+                document.getElementById('topSpentSection').style.display = 'block';
                 loadStatistics();
             } else {
                 document.querySelector('.tab-btn:nth-child(3)').classList.add('active');
@@ -709,7 +748,6 @@
             }
         }
 
-        // Загрузка склада
         async function loadInventory() {
             try {
                 const response = await fetch(`${API_URL}/inventory`);
@@ -721,7 +759,6 @@
             }
         }
 
-        // Отображение склада
         function renderInventory(items) {
             const container = document.getElementById('inventoryContainer');
             const stockCount = document.getElementById('stockCount');
@@ -772,7 +809,6 @@
             `).join('');
         }
 
-        // Поиск и фильтрация
         function filterInventory(query) {
             if (!query) {
                 renderInventory(allItems);
@@ -785,7 +821,8 @@
             renderInventory(filtered);
         }
 
-        // Загрузка статистики
+        // ==================== СТАТИСТИКА ====================
+        
         async function loadStatistics() {
             try {
                 const response = await fetch(`${API_URL}/statistics`);
@@ -798,30 +835,35 @@
                 }
 
                 document.getElementById('statsContainer').innerHTML = `
-                    <div class="stat-card">
+                    <div class="stat-card" onclick="showBrandDetail()">
                         <div class="stat-icon">🏷️</div>
                         <div class="stat-label">Брендов</div>
                         <div class="stat-value">${data.stats.total_brands || 0}</div>
+                        <div class="stat-hint">Нажми для деталей →</div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" onclick="showFlavorDetail()">
                         <div class="stat-icon">🍇</div>
                         <div class="stat-label">Вкусов</div>
                         <div class="stat-value">${data.stats.total_flavors || 0}</div>
+                        <div class="stat-hint">Нажми для списка →</div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" onclick="showInStockDetail()">
                         <div class="stat-icon">✅</div>
                         <div class="stat-label">В наличии</div>
                         <div class="stat-value">${data.stats.in_stock_items || 0}</div>
+                        <div class="stat-hint">Нажми для списка →</div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" onclick="showOutOfStockDetail()">
                         <div class="stat-icon">❌</div>
                         <div class="stat-label">Выбыло</div>
                         <div class="stat-value">${data.stats.out_of_stock_items || 0}</div>
+                        <div class="stat-hint warning">Нажми для списка →</div>
                     </div>
-                    <div class="stat-card">
+                    <div class="stat-card" onclick="showWeightDetail()">
                         <div class="stat-icon">⚖️</div>
                         <div class="stat-label">Всего грамм</div>
                         <div class="stat-value">${data.stats.total_grams_in_stock || 0}г</div>
+                        <div class="stat-hint">По граммовкам →</div>
                     </div>
                 `;
 
@@ -842,7 +884,138 @@
             }
         }
 
-        // Загрузка логов
+        function showDetail(title, data, columns) {
+            document.getElementById('detailView').style.display = 'block';
+            document.getElementById('topSpentSection').style.display = 'none';
+            document.getElementById('detailTitle').textContent = title;
+            
+            if (data.length === 0) {
+                document.getElementById('detailContent').innerHTML = 
+                    '<p style="color:#9E9E9E;text-align:center;padding:30px;">Нет данных для отображения</p>';
+                return;
+            }
+            
+            let tableHTML = '<table class="detail-table">';
+            
+            tableHTML += '<thead><tr>';
+            columns.forEach(col => {
+                tableHTML += `<th>${col.label}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
+            
+            data.forEach((item, index) => {
+                tableHTML += '<tr>';
+                columns.forEach(col => {
+                    const value = col.render ? col.render(item) : (item[col.key] !== undefined ? item[col.key] : '-');
+                    tableHTML += `<td>${value}</td>`;
+                });
+                tableHTML += '</tr>';
+            });
+            
+            tableHTML += '</tbody></table>';
+            document.getElementById('detailContent').innerHTML = tableHTML;
+        }
+
+        function closeDetail() {
+            document.getElementById('detailView').style.display = 'none';
+            document.getElementById('topSpentSection').style.display = 'block';
+        }
+
+        async function showBrandDetail() {
+            try {
+                const response = await fetch(`${API_URL}/statistics/brands`);
+                const data = await response.json();
+                showDetail('📊 Детализация по брендам', data, [
+                    { key: 'brand', label: 'Бренд' },
+                    { key: 'total_flavors', label: 'Кол-во вкусов' },
+                    { key: 'total_packs', label: 'Всего упаковок' },
+                    { key: 'total_grams', label: 'Всего грамм' },
+                    { key: 'in_stock', label: '✅ В наличии' },
+                    { key: 'out_of_stock', label: '❌ Выбыло' }
+                ]);
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showToast('Ошибка загрузки данных', true);
+            }
+        }
+
+        async function showFlavorDetail() {
+            try {
+                const response = await fetch(`${API_URL}/statistics/flavors`);
+                const data = await response.json();
+                showDetail('🍇 Все вкусы', data, [
+                    { key: 'brand', label: 'Бренд' },
+                    { key: 'flavor', label: 'Вкус' },
+                    { key: 'weights', label: 'Граммовки (г)' },
+                    { key: 'total_packs', label: 'Упаковок' },
+                    { key: 'total_grams', label: 'Всего грамм' }
+                ]);
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showToast('Ошибка загрузки данных', true);
+            }
+        }
+
+        async function showInStockDetail() {
+            try {
+                const response = await fetch(`${API_URL}/statistics/in-stock`);
+                const data = await response.json();
+                showDetail('✅ Позиции в наличии', data, [
+                    { key: 'brand', label: 'Бренд' },
+                    { key: 'flavor', label: 'Вкус' },
+                    { key: 'weight', label: 'Граммовка (г)' },
+                    { key: 'packs', label: 'Упаковок' },
+                    { 
+                        key: 'total', 
+                        label: 'Всего грамм',
+                        render: (item) => `${item.packs * item.weight} г`
+                    }
+                ]);
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showToast('Ошибка загрузки данных', true);
+            }
+        }
+
+        async function showOutOfStockDetail() {
+            try {
+                const response = await fetch(`${API_URL}/statistics/out-of-stock`);
+                const data = await response.json();
+                showDetail('❌ Выбывшие позиции', data, [
+                    { key: 'brand', label: 'Бренд' },
+                    { key: 'flavor', label: 'Вкус' },
+                    { key: 'weight', label: 'Граммовка (г)' },
+                    { 
+                        key: 'status', 
+                        label: 'Статус',
+                        render: () => '<span style="color:#FF5252;font-weight:600;">Выбыл</span>'
+                    }
+                ]);
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showToast('Ошибка загрузки данных', true);
+            }
+        }
+
+        async function showWeightDetail() {
+            try {
+                const response = await fetch(`${API_URL}/statistics/weights`);
+                const data = await response.json();
+                showDetail('⚖️ Распределение по граммовкам', data, [
+                    { key: 'weight', label: 'Граммовка (г)' },
+                    { key: 'total_items', label: 'Кол-во позиций' },
+                    { key: 'total_packs', label: 'Всего упаковок' },
+                    { key: 'total_grams', label: 'Всего грамм' },
+                    { key: 'in_stock', label: '✅ В наличии' }
+                ]);
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showToast('Ошибка загрузки данных', true);
+            }
+        }
+
+        // ==================== ИСТОРИЯ ====================
+        
         async function loadLogs() {
             try {
                 const response = await fetch(`${API_URL}/logs?limit=50`);
@@ -865,7 +1038,8 @@
             }
         }
 
-        // Открытие модального окна
+        // ==================== МОДАЛЬНОЕ ОКНО ====================
+        
         async function openModal(mode) {
             currentMode = mode;
             
@@ -898,7 +1072,6 @@
             document.getElementById('operationModal').classList.remove('open');
         }
 
-        // Загрузка брендов
         async function loadBrands() {
             try {
                 const response = await fetch(`${API_URL}/brands`);
@@ -910,7 +1083,6 @@
             }
         }
 
-        // Событие выбора бренда
         document.getElementById('brandInput').addEventListener('input', async function(e) {
             const brand = e.target.value;
             if (brand.length > 0) {
@@ -925,7 +1097,6 @@
             }
         });
 
-        // Выполнение операции
         async function processTransaction() {
             const brand = document.getElementById('brandInput').value.trim();
             const flavor = document.getElementById('flavorInput').value.trim();
@@ -960,25 +1131,21 @@
             }
         }
 
-        // Экспорт в Excel
         function exportToExcel() {
             window.open(`${API_URL}/export/excel`, '_blank');
             showToast('Скачивание файла Excel... 📥');
         }
 
-        // Закрытие модалки по клику вне окна
         window.onclick = function(event) {
             if (event.target === document.getElementById('operationModal')) {
                 closeModal();
             }
         }
 
-        // Закрытие по Escape
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 closeModal();
             }
-            // Ctrl+K для закупа, Ctrl+J для расхода
             if (event.ctrlKey && event.key === 'k') {
                 event.preventDefault();
                 openModal('buy');
@@ -995,12 +1162,10 @@
             return div.innerHTML;
         }
 
-        // Начальная загрузка
+        // Запуск
         checkConnection();
         loadInventory();
         loadBrands();
-        
-        // Проверка соединения каждые 30 секунд
         setInterval(checkConnection, 30000);
     </script>
 </body>
