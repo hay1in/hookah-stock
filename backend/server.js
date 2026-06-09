@@ -160,7 +160,7 @@ app.get('/api/weights/:brand/:flavor', authMiddleware, (req, res) => {
 
 // ✏️ ОБНОВИТЬ ТЕГИ ПОЗИЦИИ
 app.put('/api/inventory/:id/tags', authMiddleware, requireAdmin, (req, res) => {
-    const { id } = req.params;
+    const id = req.params.id;
     const { tags } = req.body;
     
     try {
