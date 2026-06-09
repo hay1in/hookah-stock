@@ -158,6 +158,49 @@ app.get('/api/weights/:brand/:flavor', authMiddleware, (req, res) => {
     } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
+// ✏️ ОБНОВИТЬ ТЕГИ ПОЗИЦИИ
+app.put('/api/inventory/:id/tags', authMiddleware, requireAdmin, (req, res) => {
+    const { id } = req.params;
+    const { tags } = req.body;
+    
+    try {
+        const existing = runQuery('SELECT * FROM inventory WHERE id = ?', [id]);
+        if (existing.length === 0) {
+            return res.status(404).json({ error: 'Позиция не найдена' });
+        }
+        
+        const tagsStr = tags ? tags.join(',') : '';
+        
+        if (tags && tags.length > 0) {
+            tags.forEach(tagName => {
+                if (!tagName || tagName.trim() === '') return;
+                tagName = tagName.trim();
+                let tagExists = runQuery('SELECT * FROM tags WHERE name = ?', [tagName]);
+                if (tagExists.length === 0) {
+                    const color = getNextColor();
+                    db.run('INSERT INTO tags (name, color) VALUES (?, ?)', [tagName, color]);
+                }
+            });
+        }
+        
+        db.run('UPDATE inventory SET tags = ?, updated_at = datetime("now") WHERE id = ?', [tagsStr, id]);
+        saveDatabase();
+        
+        const updatedItem = runQuery('SELECT * FROM inventory WHERE id = ?', [id])[0];
+        updatedItem.tagsArray = updatedItem.tags ? updatedItem.tags.split(',').filter(t => t) : [];
+        
+        const message = `✏️ ОБНОВЛЕНЫ ТЕГИ: ${updatedItem.brand} "${updatedItem.flavor}" ${updatedItem.weight}г`;
+        db.run('INSERT INTO logs (type, brand, flavor, weight, quantity, message, timestamp) VALUES (?, ?, ?, ?, ?, ?, datetime("now"))', ['EDIT_TAGS', updatedItem.brand, updatedItem.flavor, updatedItem.weight, 0, message]);
+        
+        res.json({ success: true, item: updatedItem, message: 'Теги обновлены!' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 🟢 ЗАКУП
+app.post('/api/buy', authMiddleware, requireAdmin, (req, res) => {
+
 app.post('/api/buy', authMiddleware, requireAdmin, (req, res) => {
     const { brand, flavor, weight, quantity, tags } = req.body;
     if (!brand || !flavor || !weight || !quantity || quantity <= 0) return res.status(400).json({ error: 'Заполните все поля корректно' });
