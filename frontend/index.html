@@ -51,15 +51,17 @@
         .card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:15px}
         .brand{color:#BB86FC;font-weight:700;font-size:0.85em;text-transform:uppercase;letter-spacing:2px;background:rgba(187,134,252,0.1);padding:4px 12px;border-radius:10px;display:inline-block}
         .flavor{font-size:1.5em;font-weight:700;margin:12px 0;line-height:1.2}
-        .tags-container{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+        .tags-container{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
         .tag{display:inline-block;padding:3px 10px;border-radius:15px;font-size:0.7em;font-weight:600;letter-spacing:0.5px;text-transform:uppercase}
+        .tag-edit-btn{padding:3px 8px;border-radius:15px;font-size:0.65em;cursor:pointer;background:rgba(187,134,252,0.15);color:#BB86FC;border:1px dashed rgba(187,134,252,0.4);font-weight:600;transition:all 0.3s;white-space:nowrap}
+        .tag-edit-btn:hover{background:rgba(187,134,252,0.3);border-style:solid}
         .weight-info{display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap}
         .weight-badge{display:inline-block;background:rgba(187,134,252,0.15);padding:6px 14px;border-radius:25px;font-size:0.85em;color:#BB86FC;border:1px solid rgba(187,134,252,0.3)}
         .stock-bar{background:rgba(19,17,28,0.8);border-radius:12px;padding:15px;margin-top:15px}
         .stock-info{display:flex;justify-content:space-between;align-items:center}
         .stock-amount{font-size:1.8em;font-weight:700;background:linear-gradient(135deg,#64FFDA,#00E676);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
         .out-badge{position:absolute;top:20px;right:20px;background:linear-gradient(135deg,#FF5252,#FF1744);color:white;padding:8px 16px;border-radius:25px;font-size:0.85em;font-weight:700;box-shadow:0 5px 15px rgba(255,82,82,0.4)}
-        .card-actions{display:flex;gap:8px;margin-top:12px}
+        .card-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
         .btn-sm{padding:8px 16px;border:none;border-radius:10px;font-weight:600;cursor:pointer;font-size:0.8em;transition:all 0.3s;display:flex;align-items:center;gap:5px}
         .btn-sm:disabled{opacity:0.3;cursor:not-allowed}
         .btn-clear-one{background:rgba(255,145,0,0.2);color:#FF9100;border:1px solid rgba(255,145,0,0.3)}
@@ -170,6 +172,7 @@
         </div>
     </div>
 
+    <!-- Модалка закуп/расход -->
     <div class="modal" id="operationModal">
         <div class="modal-content">
             <h2 id="modalTitle">Операция</h2>
@@ -188,6 +191,24 @@
             <div class="modal-actions"><button class="btn btn-cancel" onclick="closeModal()">Отмена</button><button class="btn btn-submit btn-buy" id="submitBtn" onclick="processTransaction()">Выполнить</button></div>
         </div>
     </div>
+
+    <!-- Модалка редактирования тегов -->
+    <div class="modal" id="editTagsModal">
+        <div class="modal-content">
+            <h2>✏️ Редактировать теги</h2>
+            <p style="color:#9E9E9E;margin-bottom:20px;" id="editTagsItemName"></p>
+            <div class="input-group">
+                <label>🏷️ Теги</label>
+                <div class="tags-input-wrap">
+                    <input type="text" class="tags-input" id="editTagInput" placeholder="Введите тег..." onkeydown="if(event.key==='Enter'){event.preventDefault();addEditTag();}">
+                    <button class="btn-add-tag" onclick="addEditTag()">+ Добавить</button>
+                </div>
+                <div class="selected-tags" id="editSelectedTagsContainer"></div>
+            </div>
+            <div class="modal-actions"><button class="btn btn-cancel" onclick="closeEditTagsModal()">Отмена</button><button class="btn btn-submit btn-buy" onclick="saveTags()">💾 Сохранить</button></div>
+        </div>
+    </div>
+
     <div class="modal" id="confirmClearModal">
         <div class="modal-content">
             <h2>🗑️ Подтверждение</h2>
@@ -202,7 +223,7 @@
         var API_URL = 'https://hookah-api.onrender.com/api';
         var authToken = ''; var currentUser = null; var currentMode = 'buy';
         var allItems = []; var allTags = []; var selectedFilterTag = null;
-        var currentTags = []; var clearTarget = null;
+        var currentTags = []; var editTags = []; var editItemId = null; var clearTarget = null;
 
         var savedToken = localStorage.getItem('hookah_token');
         var savedUser = localStorage.getItem('hookah_user');
@@ -314,7 +335,14 @@
             var isAdmin = currentUser && currentUser.role === 'admin';
             c.innerHTML = sorted.map(function(item) {
                 var tags = getItemTagsArray(item);
-                var tagsHTML = tags.length > 0 ? '<div class="tags-container">' + tags.map(function(t) { var col = getTagColor(t); return '<span class="tag" style="background:' + col + '33;color:' + col + ';border:1px solid ' + col + '">' + escapeHtml(t) + '</span>'; }).join('') + '</div>' : '';
+                var tagsHTML = '<div class="tags-container">';
+                if (tags.length > 0) {
+                    tagsHTML += tags.map(function(t) { var col = getTagColor(t); return '<span class="tag" style="background:' + col + '33;color:' + col + ';border:1px solid ' + col + '">' + escapeHtml(t) + '</span>'; }).join('');
+                }
+                if (isAdmin) {
+                    tagsHTML += '<button class="tag-edit-btn" onclick="openEditTags(\'' + item.id + '\', \'' + escapeHtml(item.brand) + '\', \'' + escapeHtml(item.flavor) + '\', ' + item.weight + ')" title="Редактировать теги">✏️</button>';
+                }
+                tagsHTML += '</div>';
                 var actionsHTML = (isAdmin && item.packs > 0) ? '<div class="card-actions"><button class="btn-sm btn-clear-one" onclick="confirmClearPosition(\'' + escapeHtml(item.brand) + '\', \'' + escapeHtml(item.flavor) + '\', ' + item.weight + ')">🗑️ Выбить эту</button><button class="btn-sm btn-clear-all" onclick="confirmClearFlavor(\'' + escapeHtml(item.brand) + '\', \'' + escapeHtml(item.flavor) + '\')">💀 Выбить вкус полностью</button></div>' : '';
                 return '<div class="card ' + (item.packs === 0 ? 'out-of-stock' : '') + '">' + (item.packs === 0 ? '<span class="out-badge">ВЫБЫЛ</span>' : '') +
                     '<div class="card-header"><span class="brand">' + escapeHtml(item.brand) + '</span></div><div class="flavor">' + escapeHtml(item.flavor) + '</div>' + tagsHTML +
@@ -322,6 +350,55 @@
                     '<div class="stock-info"><span style="color:#9E9E9E;">📦 Упаковок:</span><span class="stock-amount">' + item.packs + ' шт</span></div>' +
                     '<div class="stock-info" style="margin-top:8px;"><span style="color:#9E9E9E;">⚖️ Всего:</span><span style="color:#64FFDA;font-weight:600;">' + (item.packs * item.weight) + ' г</span></div></div>' + actionsHTML + '</div>';
             }).join('');
+        }
+
+        // ========== РЕДАКТИРОВАНИЕ ТЕГОВ ==========
+        function openEditTags(id, brand, flavor, weight) {
+            editItemId = id;
+            document.getElementById('editTagsItemName').textContent = brand + ' "' + flavor + '" ' + weight + 'г';
+            var item = allItems.find(function(i) { return i.id === id; });
+            editTags = item ? getItemTagsArray(item).slice() : [];
+            document.getElementById('editTagInput').value = '';
+            renderEditTags();
+            document.getElementById('editTagsModal').classList.add('open');
+            document.getElementById('editTagInput').focus();
+        }
+
+        function closeEditTagsModal() { document.getElementById('editTagsModal').classList.remove('open'); editItemId = null; }
+
+        function addEditTag() {
+            var input = document.getElementById('editTagInput'); var val = input.value.trim();
+            if (!val) return;
+            if (editTags.indexOf(val) === -1) editTags.push(val);
+            input.value = ''; renderEditTags(); input.focus();
+        }
+
+        function removeEditTag(index) { editTags.splice(index, 1); renderEditTags(); }
+
+        function renderEditTags() {
+            var c = document.getElementById('editSelectedTagsContainer');
+            c.innerHTML = editTags.map(function(t, i) {
+                var found = allTags.find(function(at) { return at.name === t; });
+                var color = found ? found.color : '#BB86FC';
+                return '<span class="selected-tag" style="background:' + color + '33;color:' + color + ';border:1px solid ' + color + '">' + escapeHtml(t) + '<span class="selected-tag-remove" onclick="removeEditTag(' + i + ')">✕</span></span>';
+            }).join('');
+        }
+
+        async function saveTags() {
+            if (!editItemId) return;
+            try {
+                var r = await fetch(API_URL + '/inventory/' + encodeURIComponent(editItemId) + '/tags', {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify({ tags: editTags })
+                });
+                var d = await r.json();
+                if (!r.ok) throw new Error(d.error);
+                closeEditTagsModal();
+                await loadInventory();
+                await loadTags();
+                showToast('Теги обновлены! ✅');
+            } catch (e) { showToast(e.message, true); }
         }
 
         function confirmClearPosition(brand, flavor, weight) {
@@ -458,8 +535,16 @@
 
         function exportToExcel() { window.open(API_URL + '/export/excel', '_blank'); showToast('Скачивание... 📥'); }
 
-        window.onclick = function(e) { if (e.target === document.getElementById('operationModal')) closeModal(); if (e.target === document.getElementById('confirmClearModal')) closeConfirmClear(); };
-        document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { closeModal(); closeConfirmClear(); } if (e.ctrlKey && e.key === 'k') { e.preventDefault(); openModal('buy'); } if (e.ctrlKey && e.key === 'j') { e.preventDefault(); openModal('spend'); } });
+        window.onclick = function(e) {
+            if (e.target === document.getElementById('operationModal')) closeModal();
+            if (e.target === document.getElementById('editTagsModal')) closeEditTagsModal();
+            if (e.target === document.getElementById('confirmClearModal')) closeConfirmClear();
+        };
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') { closeModal(); closeEditTagsModal(); closeConfirmClear(); }
+            if (e.ctrlKey && e.key === 'k') { e.preventDefault(); openModal('buy'); }
+            if (e.ctrlKey && e.key === 'j') { e.preventDefault(); openModal('spend'); }
+        });
         function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
     </script>
 </body>
